@@ -1,7 +1,5 @@
 %% Input:
 %      data         A row vector of observations.
-%      alpha        A scalar. The concentration parameter for the Dirichlet
-%                   process.
 %      a            A scalar. The shape for the Gamma distribution.
 %      b            A scalar. The rate for the Gamma distribution.
 %      T            A scalar. The truncation value of the infinite vector.
@@ -18,24 +16,31 @@
 %      z            A matrix of size length(data) * T. The variational
 %                   parameters for the indicators of each observation.
 
-function [z, mu, lambda, pi] = vb(data, alpha, a, b, T, maxIter)
+function [z, mu, lambda, pi, alpha] = vb(data, a, b, s1, s2, T, maxIter)
 if nargin < 2
-    alpha = 1;
-end
-if nargin < 3
     a = 1;
 end
-if nargin < 4
+if nargin < 3
     b = 1;
 end
+if nargin < 4
+    s1 = 1;
+end
 if nargin < 5
-    T = 20;
+    s2 = 1;
 end
 if nargin < 6
+    T = 20;
+end
+if nargin < 7
     maxIter = 100;
 end
 
-%% Init: 
+%% Init
+
+% init the concentration parameter 
+alpha.a1 = 1;
+alpha.a2 = 1;
 
 % each row is corresponding to a observation and each column is
 % corresponding to a cluster
@@ -66,7 +71,7 @@ for iter = 1:maxIter
     % parameters of pi
     for j = 1:T
         pi(j).a1 = 1 + z_agg1(j);
-        pi(j).a2 = alpha + z_agg2(j+1);
+        pi(j).a2 = alpha.a1 / alpha.a2 + z_agg2(j+1);
     end
     
     % parameters of mu
@@ -83,6 +88,14 @@ for iter = 1:maxIter
         lambda(j).b = b + 1/2 * E_squre + 1/2 * (data .^ 2) * z(:,j)...
             + 1/2 * z_agg1(j) * E_squre - data * z(:,j) * mu(j).mean;
     end
+    
+    % parameters of alpha
+    alpha.a1 = s1 + T;
+    term2 = 0;
+    for j = 1:T-1
+        term2 = term2 + psi(pi(j).a2) - psi(pi(j).a1 + pi(j).a2);
+    end
+    alpha.a2 = s2 - term2;
     
     % parameters of indicators
     for i = 1:length(data)
